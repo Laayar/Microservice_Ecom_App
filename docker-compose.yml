@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - microservices-network
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/auth-service
+      - JWT_SECRET=xQ9j4pl2vR8fG7h6ZbN5mA3kR1sT0yWz
+      - JWT_EXPIRES_IN=1d
+    depends_on:
+      - mongodb
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # product-service: (uncomment when ready)
+  #   build:
+  #     context: ./product-service
+  #   ports:
+  #     - "5001:5001"
+  #   networks:
+  #     - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
+
+volumes:
+  mongo-data:

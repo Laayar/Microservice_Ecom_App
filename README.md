@@ -666,38 +666,341 @@ docker-compose up -d
 docker ps
 ```
 
-### Option B — Azure (Enterprise Grade, Scalable)
+### Option B — Azure (Step-by-Step, Starting NOW)
 
-| Azure Service | What it does |
-|---------------|-------------|
-| **Azure Container Registry (ACR)** | Private Docker Hub for your images |
-| **Azure Container Apps** | Run containers without managing servers |
-| **Azure App Service** | Host containers with auto-scaling |
-| **Azure Cosmos DB** | Managed MongoDB-compatible database |
+---
+
+#### STOP — Read This First: Which Azure Service Should You Use?
+
+You are currently on **"Create Container Instance" (ACI)** in the screenshot.
+This is a valid starting point but you need to understand the difference:
+
+```
++--------------------------------------------------------------+
+|  Azure Service          | Best For              | Your Case  |
++--------------------------------------------------------------+
+|  Container Instances    | Quick test, 1 container| First test |
+|  (ACI) -- YOU ARE HERE  | Simple, no scaling    | OK for now |
+|                         |                        |            |
+|  Container Apps         | Multiple microservices | FUTURE goal|
+|  (Recommended later)    | Auto-scaling, URLs     | Phase 2+   |
+|                         |                        |            |
+|  App Service + Docker   | Web apps, easy deploy | Alternative|
+|  (also good)            | Slot swaps, CI/CD      |            |
++--------------------------------------------------------------+
+
+RECOMMENDATION:
+  Use ACI now to learn and test auth-service alone.
+  Switch to Container Apps when you have 2+ services.
+```
+
+---
+
+#### QUESTION 1: GUI vs CLI vs VS Code Extension?
+
+```
++-----------------------------------------------------------+
+|  TOOL             | WHEN TO USE               | VERDICT   |
++-----------------------------------------------------------+
+|  Azure Portal GUI | Learning, first time,     | USE NOW   |
+|  (browser)        | visual exploration        | to learn  |
+|                   |                           |           |
+|  Azure CLI (az)   | Automation, scripts,      | USE AFTER |
+|  (terminal)       | Jenkins pipeline, repeatable| learning |
+|                   |                           |           |
+|  VS Code Extension| Quick deploy while coding,| OPTIONAL  |
+|  "Azure Tools"    | browse resources in editor| nice bonus|
++-----------------------------------------------------------+
+```
+
+**VS Code Extension to install (optional but helpful):**
+
+Install from VS Code Extensions tab (Ctrl+Shift+X):
+- Search: **"Azure Tools"** by Microsoft (installs a pack of extensions)
+- Or individually: **"Azure Container Apps"** or **"Docker"** extension
+
+The Docker extension in VS Code lets you:
+- Right-click an image → push to Docker Hub or ACR
+- Right-click a running container → open logs, terminal
+- See all your images and containers visually in the sidebar
+
+**For now: use the GUI to learn, then switch to CLI for automation.**
+
+---
+
+#### QUESTION 2: What to Push — Whole App or Service by Service?
+
+```
+ANSWER: ONE SERVICE AT A TIME — always.
+
+Your current situation:
+  microservices-app/
+    auth-service/     <-- push THIS first (it's ready)
+    (product-service) <-- push LATER when built
+    (order-service)   <-- push LATER when built
+
+What you push to Docker Hub = ONE IMAGE PER SERVICE:
+  laayardev/auth-service:latest     <-- push now
+  laayardev/mongodb:...             <-- NOT needed (use official image)
+  laayardev/product-service:latest  <-- push later
+  laayardev/order-service:latest    <-- push later
+
+MongoDB = you NEVER build and push MongoDB yourself.
+You always use the official image: mongo:7
+In Azure: use MongoDB Atlas (free tier) or Azure Cosmos DB.
+```
+
+**The flow for each service:**
+
+```
+  Your Code            Docker Hub              Azure
+  ---------            ----------              -----
+  auth-service/   -->  laayardev/              ACI or
+  Dockerfile           auth-service:latest --> Container Apps
+                                               (reads from Docker Hub)
+```
+
+---
+
+#### STEP-BY-STEP: Fix the Azure Portal Screenshot
+
+**Looking at your screenshot — 3 things are wrong:**
+
+```
+ISSUE 1: Container name = "microservices-rg"
+  - "rg" means Resource Group, NOT a container name
+  - Fix: change the name to "auth-service"
+
+ISSUE 2: Image source = "Quickstart images"
+  - This uses Microsoft's demo images, not yours!
+  - Fix: select "Other registry" to use Docker Hub
+
+ISSUE 3: Image = mcr.microsoft.com/azuredocs/aci-helloworld
+  - This is a Microsoft sample app
+  - Fix: enter your own image: laayardev/auth-service:latest
+```
+
+**Corrected form values:**
+
+```
+Container name:  auth-service
+Region:          (US) East US    <-- fine as-is
+SKU:             Standard        <-- fine as-is
+Image source:    Other registry  <-- CHANGE THIS
+Registry login:  (leave blank for public Docker Hub images)
+Image:           laayardev/auth-service:latest
+OS type:         Linux
+Size:            1 vcpu, 1.5 GB memory  <-- fine as-is
+```
+
+---
+
+#### FULL WORKFLOW: Local Container --> Docker Hub --> Azure ACI
+
+**Step 1 — Make sure Docker Desktop is running on your machine**
 
 ```bash
-# Login to Azure
-az login
+docker --version
+# Should show: Docker version 24.x or higher
+```
 
-# Create resource group
+**Step 2 — Build your auth-service image locally**
+
+```bash
+# Run this from the auth-service folder
+cd auth-service
+docker build -t laayardev/auth-service:latest .
+
+# Verify it was created
+docker images
+# You should see: laayardev/auth-service  latest  ...
+```
+
+**Step 3 — Test the image locally before pushing**
+
+```bash
+docker run -d \
+  --name auth-test \
+  -p 5000:5000 \
+  -e PORT=5000 \
+  -e NODE_ENV=production \
+  -e MONGO_URI=mongodb://host.docker.internal:27017/auth-service \
+  -e JWT_SECRET=mysecretkey \
+  -e JWT_EXPIRES_IN=1d \
+  laayardev/auth-service:latest
+
+# Test health endpoint
+curl http://localhost:5000/health
+# Expected: {"status":"ok","service":"auth-service"}
+
+# Stop test container when done
+docker stop auth-test && docker rm auth-test
+```
+
+**Step 4 — Push the image to Docker Hub**
+
+```bash
+# Login to Docker Hub
+docker login
+# Enter your Docker Hub username: laayardev
+# Enter your Docker Hub password
+
+# Push the image
+docker push laayardev/auth-service:latest
+
+# Your image is now public at:
+# https://hub.docker.com/r/laayardev/auth-service
+```
+
+**Step 5 — Deploy to Azure Container Instances (GUI)**
+
+Go to the Azure Portal → Create Container Instance → fill in:
+
+```
+Basics tab:
+  Subscription:     your subscription
+  Resource group:   microservices-rg  (create new if needed)
+  Container name:   auth-service
+  Region:           (US) East US
+  Image source:     Other registry
+  Image:            laayardev/auth-service:latest
+  OS type:          Linux
+  Size:             1 vcpu, 1.5 GB
+
+Networking tab:
+  DNS name label:   laayardev-auth    (becomes laayardev-auth.eastus.azurecontainer.io)
+  Port:             5000
+  Protocol:         TCP
+
+Advanced tab (Environment Variables -- IMPORTANT!):
+  PORT              5000
+  NODE_ENV          production
+  MONGO_URI         mongodb+srv://user:pass@cluster.mongodb.net/auth-service
+  JWT_SECRET        your-super-secret-key-min-32-chars
+  JWT_EXPIRES_IN    1d
+```
+
+Click **"Review + create"** then **"Create"**.
+
+**Step 6 — Verify the deployment**
+
+```bash
+# Your service will be live at:
+https://laayardev-auth.eastus.azurecontainer.io:5000/health
+
+# Test it:
+curl https://laayardev-auth.eastus.azurecontainer.io:5000/health
+# Expected: {"status":"ok","service":"auth-service"}
+```
+
+---
+
+#### ALTERNATIVE: Azure CLI (for automation later)
+
+After learning the GUI, switch to CLI for speed and Jenkins integration:
+
+```bash
+# 1. Install Azure CLI
+# Windows: winget install Microsoft.AzureCLI
+
+# 2. Login
+az login
+# Opens browser for authentication
+
+# 3. Create resource group (only once)
 az group create --name microservices-rg --location eastus
 
-# Create container registry
-az acr create --resource-group microservices-rg \
-  --name youracrname --sku Basic
-
-# Build and push to ACR
-az acr build --registry youracrname \
-  --image auth-service:v1 ./auth-service
-
-# Deploy container app
-az containerapp create \
-  --name auth-service \
+# 4. Deploy auth-service from Docker Hub
+az container create \
   --resource-group microservices-rg \
-  --image youracrname.azurecr.io/auth-service:v1 \
-  --target-port 5000 \
-  --ingress external
+  --name auth-service \
+  --image laayardev/auth-service:latest \
+  --cpu 1 \
+  --memory 1.5 \
+  --ports 5000 \
+  --dns-name-label laayardev-auth \
+  --environment-variables \
+    PORT=5000 \
+    NODE_ENV=production \
+    JWT_EXPIRES_IN=1d \
+  --secure-environment-variables \
+    JWT_SECRET=your-super-secret-key \
+    MONGO_URI=your-mongodb-connection-string
+
+# 5. Check status
+az container show \
+  --resource-group microservices-rg \
+  --name auth-service \
+  --query "{Status:instanceView.state, IP:ipAddress.fqdn}" \
+  --output table
+
+# 6. View logs
+az container logs \
+  --resource-group microservices-rg \
+  --name auth-service
 ```
+
+---
+
+#### MongoDB in the Cloud — Use Atlas (Free Tier)
+
+You do NOT run MongoDB as an ACI container. Use MongoDB Atlas instead:
+
+```
+1. Go to: https://www.mongodb.com/atlas
+2. Create free account
+3. Create a free cluster (M0 — free forever)
+4. Create a database user:
+   Username: authuser
+   Password: strongpassword
+5. Whitelist Azure IPs (or allow 0.0.0.0/0 for testing)
+6. Get your connection string:
+   mongodb+srv://authuser:strongpassword@cluster0.xxxxx.mongodb.net/auth-service
+7. Use this string as MONGO_URI in Azure environment variables
+```
+
+---
+
+#### Architecture — Phase 1 (What You're Building Now)
+
+```
+Internet
+   |
+   v
++------------------------------------------+
+|  Azure Container Instance (ACI)          |
+|  auth-service container                  |
+|  laayardev/auth-service:latest           |
+|  Port 5000                               |
+|  URL: laayardev-auth.eastus.azurecontainer.io |
++------------------------------------------+
+   |
+   v  MONGO_URI env variable
++------------------------------------------+
+|  MongoDB Atlas (free tier)               |
+|  cluster0.xxxxx.mongodb.net              |
+|  Database: auth-service                  |
++------------------------------------------+
+```
+
+---
+
+#### When to Upgrade from ACI to Container Apps
+
+```
+Use ACI (now):
+  - Testing a single service
+  - Learning Azure
+  - Simple, no auto-scaling needed
+
+Upgrade to Container Apps (later, Phase 4):
+  - You have 2+ services
+  - You need services to talk to each other (internal DNS)
+  - You want auto-scaling (scale to zero to save money)
+  - You want a proper managed environment
+```
+
+
 
 ---
 
