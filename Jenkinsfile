@@ -45,9 +45,6 @@ pipeline {
       }
     }
     stage('Deploy to Cloud') {
-      when {
-        branch 'main'
-      }
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'github-container-registry',
