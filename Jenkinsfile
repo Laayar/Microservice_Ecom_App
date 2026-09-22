@@ -23,8 +23,7 @@ pipeline {
     stage('Run Tests') {
       steps {
         dir('auth-service') {
-          sh 'npm test'
-          sh 'npm run test:ui'
+            sh 'npm run test:ci'
           sh 'npm run test:coverage'
         }
       }
@@ -71,9 +70,9 @@ pipeline {
                         "docker login ghcr.io --username $GHCR_USERNAME --password-stdin"
 
                     ssh -o StrictHostKeyChecking=no azureuser@51.107.1.67 "
-                        docker pull $GHCR_IMAGE:latest &&
-                        docker stop auth-service || true &&
-                        docker rm auth-service || true &&
+                      docker pull $GHCR_IMAGE:latest || exit 1;
+                      docker stop auth-service || true
+                      docker rm auth-service || true
                         docker run -d \\
                             --name auth-service \\
                             -p 5000:5000 \\

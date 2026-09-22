@@ -21,6 +21,7 @@ Thumbs.db
 # Build output
 /dist/
 /build/
+/coverage/
 
 # IDE files
 .vscode/
@@ -30,3 +31,4 @@ Thumbs.db
 Foundation & Architecture/
 DevOps & Cloud-Native Deployment/
 auth-service/ARCJET.md
+DEPLOYMENT_READINESS.md
