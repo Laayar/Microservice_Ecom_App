@@ -51,12 +51,16 @@ pipeline {
           usernameVariable: 'GHCR_USERNAME',
           passwordVariable: 'GHCR_TOKEN'
         )]) {
-          sshagent(['cloud-server-ssh-key']) {
+          withCredentials([sshUserPrivateKey(
+            credentialsId: 'cloud-server-ssh-key',
+            keyFileVariable: 'SSH_KEY',
+            usernameVariable: 'SSH_USER'
+          )]) {
             sh '''
-                    printf '%s' "$GHCR_TOKEN" | ssh -o StrictHostKeyChecking=no azureuser@51.107.1.67 \
+                    printf '%s' "$GHCR_TOKEN" | ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@51.107.1.67" \
                         "docker login ghcr.io --username $GHCR_USERNAME --password-stdin"
 
-                    ssh -o StrictHostKeyChecking=no azureuser@51.107.1.67 "
+                    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@51.107.1.67" "
                       docker pull $GHCR_IMAGE:latest || exit 1;
                       docker stop auth-service || true
                       docker rm auth-service || true
