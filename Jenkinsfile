@@ -7,24 +7,18 @@ pipeline {
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
   stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-        echo "Code checked out — Branch: ${env.BRANCH_NAME}"
-      }
-    }
     stage('Install Dependencies') {
       steps {
         dir('auth-service') {
-          sh 'npm ci'
+          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm ci'
         }
       }
     }
     stage('Run Tests') {
       steps {
         dir('auth-service') {
-            sh 'npm run test:ci'
-          sh 'npm run test:coverage'
+          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm run test:ci'
+          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm run test:coverage'
         }
       }
     }
