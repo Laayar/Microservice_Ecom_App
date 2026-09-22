@@ -7,18 +7,14 @@ pipeline {
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
   stages {
-    stage('Install Dependencies') {
-      steps {
-        dir('auth-service') {
-          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm ci'
-        }
-      }
-    }
     stage('Run Tests') {
       steps {
         dir('auth-service') {
-          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm run test:ci'
-          sh 'docker run --rm -v "$PWD:/app" -w /app node:22-alpine npm run test:coverage'
+          sh '''
+            tar -czf - --exclude=node_modules --exclude=coverage --exclude=.git --exclude='.env*' . | \
+              docker run --rm -i -w /app node:22-alpine \
+              sh -c 'tar -xzf - -C /app && npm ci && npm run test:ci && npm run test:coverage'
+          '''
         }
       }
     }
