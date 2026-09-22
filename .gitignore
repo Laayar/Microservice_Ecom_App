@@ -25,3 +25,8 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+# MD files
+Foundation & Architecture/
+DevOps & Cloud-Native Deployment/
+auth-service/ARCJET.md
