@@ -3,7 +3,7 @@
 pipeline {
   agent any
   environment {
-    GHCR_IMAGE = 'ghcr.io/Laayar/auth-service'
+    GHCR_IMAGE = 'ghcr.io/laayar/auth-service'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
   stages {
