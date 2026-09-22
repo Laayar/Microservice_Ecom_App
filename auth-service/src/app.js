@@ -2,10 +2,13 @@ import express from "express";
 import authRouter from "./routes/auth.routes.js";
 import errorMiddleware from "./middleware/error.middleware.js";
 import cors from "cors";
+import arcjetMiddleware from "./middleware/arcjet.middleware.js";
 
 const app = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(arcjetMiddleware);
 app.use(cors());
 
 app.use("/api/v1/auth", authRouter);

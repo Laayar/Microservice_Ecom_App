@@ -15,12 +15,12 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", service: "auth-service" });
 });
 const startServer = async () => {
-  try {
-    await connectToDatabase();
-  } catch (error) {
-    console.warn(
-      "Database connection failed at startup; continuing without database",
-    );
+  const databaseConnected = await connectToDatabase();
+
+  if (!databaseConnected) {
+    console.error("Database connection failed; server will not start");
+    process.exitCode = 1;
+    return;
   }
 
   app.listen(PORT, () => {
